@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=RunOpenerpServer
+Comment=Developer Utility tool to run openerp server, upgrade all modules...
+Exec=runoerp
+Terminal=false
+Type=Application
+Icon=/usr/share/runoerp/runoerp.ico
+Categories=Tools;Application;Development;
+Name[en_IN]=runoerp

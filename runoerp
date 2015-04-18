@@ -1,0 +1,109 @@
+#! /usr/bin/env python
+
+import Tkinter as tk
+import ConfigParser
+from subprocess import Popen, PIPE
+from PIL import ImageTk, Image
+import tkMessageBox
+
+class runoerp(tk.Tk):
+    def __init__(self, *args, **kwargs):
+        tk.Tk.__init__(self, *args, **kwargs)
+        
+        self.label1 = tk.Label(self, text="Server location")
+        self.label1.grid(row=0,column=0)
+         
+        self.server_var = tk.StringVar(self)
+        self.server = [
+		    '/opt/openerp/server/openerp-server',
+		    '/opt/openerp/v7.0/server/openerp-server',
+		    '/opt/odoo/v8.0/openerp-server',
+		    '/opt/odoo/v8.0/odoo'
+		    ]
+        self.server_obj = tk.OptionMenu(self, self.server_var, (), *self.server)
+        self.server_obj.configure(width=38)
+        self.server_obj.grid(row=0,column=1)
+        
+        self.label2 = tk.Label(self, text="Configuration file path")
+        self.label2.grid(row=1,column=0)
+         
+        self.confg_var = tk.StringVar(self)
+        self.confg = [
+		'/etc/openerp-server.conf',
+		'/etc/odoo.conf'
+		]
+        self.confg_obj = tk.OptionMenu(self, self.confg_var, (), *self.confg, command=self._change_dbname)
+        self.confg_obj.configure(width=38)
+        self.confg_obj.grid(row=1,column=1)
+        
+        self.label3 = tk.Label(self, text="Database")
+        self.label3.grid(row=2,column=0)
+        
+        self.db_var = tk.StringVar(self)
+        self.db_var.set('')
+        self.db_obj = tk.OptionMenu(self, self.db_var, ())
+        self.db_obj.configure(width=38)
+        self.db_obj.grid(row=2,column=1)
+
+        self.label4 = tk.Label(self, text="Upgrade All")
+        self.label4.grid(row=3,column=0)
+        
+        
+        self.check_var = tk.IntVar()
+        self.check_obj = tk.Checkbutton(self, text = "Enable", variable = self.check_var, \
+                         onvalue = 1, offvalue = 0)
+        self.check_obj.grid(row=3,column=1)
+        
+        self.logo = ImageTk.PhotoImage(Image.open('/usr/share/runoerp/runoerplogo'))
+        self.logo_obj = tk.Label(self, image=self.logo)
+        self.logo_obj.configure(width=200, height=100)
+        self.logo_obj.grid(row=0, column=2, columnspan=2, rowspan=4)
+        
+        self.run = tk.Button(self, text="Run", width=10, command=self._run_server)
+        self.run.grid(row=4,column=2)
+        
+        self.kill = tk.Button(self, text="Kill", width=10, command=self._kill_server)
+        self.kill.grid(row=4,column=3)
+
+    def _change_dbname(self, options):
+        config = ConfigParser.ConfigParser()
+        config.read(options)
+        db_user = config.get('options', 'db_user')
+        DB_NAME = []
+        if db_user:
+            db_command = 'select datname from pg_database where datdba=(select usesysid from pg_user where usename=\'%s\') and datname not in  (\'template1\', \'template0\', \'postgres\') order by datname'%(db_user)
+            p = Popen(['psql', 'postgres'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            output, err = p.communicate(db_command)
+            output = output.strip().split('\n')
+            for db in output[2:-1]:
+                db = db.strip()
+                DB_NAME.append(db)
+        menu = self.db_obj["menu"]
+        menu.delete(0, "end")
+        for string in DB_NAME:
+            menu.add_command(label=string, command=lambda value=string: self.db_var.set(value))
+            
+    def _run_server(self):
+        run_command = ''
+        if self.server_var and self.server_var.get():
+            run_command = self.server_var.get()
+        if self.confg_var and self.confg_var.get():
+            run_command = run_command + ' -c ' + self.confg_var.get()
+        if self.db_var and self.db_var.get():
+            run_command = run_command + ' -d ' + self.db_var.get()
+        if self.check_var and self.check_var.get():
+            run_command = run_command + ' -u all'
+        status = Popen(run_command, shell = True)
+        tkMessageBox.showinfo( 'Information!', 'Server Command %s,\nServer status %s,\nServer pid - %s' %(run_command, status, status.pid))
+    
+    def _kill_server(self):
+        kill_command = """kill $(ps aux | grep '[o]penerp' | awk '{print $2}')"""
+        Popen(kill_command, shell=True)
+        return True
+
+if __name__ == "__main__":
+    app = runoerp()
+    app.title("Run Openerp Server")
+    app.resizable(width='FALSE', height='FALSE')
+    app.geometry('{}x{}'.format(750, 150))
+    app.mainloop()
